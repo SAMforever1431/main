@@ -8,7 +8,13 @@ SYMBOL = "XAUUSDT"
 def fetch_order_flow():
     # 1. Fetch latest 5-minute Kline for volume delta
     kline_url = f"https://fapi.binance.com/fapi/v1/klines?symbol={SYMBOL}&interval=5m&limit=1"
-    kline_res = requests.get(kline_url).json()[0]
+    response = requests.get(kline_url).json()
+    
+    # Error checking: If Binance blocked the request
+    if isinstance(response, dict) and 'code' in response:
+        return f"⚠️ *Binance API Error:* {response.get('msg', 'Unknown Error')} (Likely GitHub US IP Block)"
+        
+    kline_res = response[0]
     
     close_price = float(kline_res[4])
     total_volume = float(kline_res[5])
@@ -20,8 +26,11 @@ def fetch_order_flow():
     depth_url = f"https://fapi.binance.com/fapi/v1/depth?symbol={SYMBOL}&limit=100"
     depth_res = requests.get(depth_url).json()
 
-    bids = [[float(price), float(qty)] for price, qty in depth_res['bids']]
-    asks = [[float(price), float(qty)] for price, qty in depth_res['asks']]
+    bids = [[float(price), float(qty)] for price, qty in depth_res.get('bids', [])]
+    asks = [[float(price), float(qty)] for price, qty in depth_res.get('asks', [])]
+
+    if not bids or not asks:
+        return f"⚠️ *Error:* Could not fetch Order Book Data."
 
     top_bid = max(bids, key=lambda x: x[1])  # Largest buy wall
     top_ask = max(asks, key=lambda x: x[1])  # Largest sell wall
